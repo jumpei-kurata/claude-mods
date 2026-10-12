@@ -1,0 +1,5 @@
+# Claude Code が mod を読み込んだ時に作る型ファイル（毎回作り直される）
+.claude-plugin/types/
+*/.claude-plugin/types/
+.DS_Store
+node_modules/
