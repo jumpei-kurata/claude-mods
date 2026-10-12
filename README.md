@@ -4,7 +4,7 @@
 ここに置いた mod は、フォルダから直接読まれる（編集 → セッションで `/reload-plugins` で反映。入れ直し不要）。
 
 置き場所: `/Users/Shared/Files From c.localized/workspace/claude-mods`（他のプロジェクトと同じ workspace。2026-10-11 に `~/claude-mods` から移した）。
-GitHub: `jumpei-kurata/claude-mods`（非公開）。
+GitHub: 未作成（作るなら `jumpei-kurata/claude-mods` を非公開で）。
 
 ## 入っている mod
 
