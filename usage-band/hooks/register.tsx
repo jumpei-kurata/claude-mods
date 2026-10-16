@@ -46,13 +46,22 @@ export const untilReset = (resetsAt: string | undefined, nowMs: number, isDaysOn
   if (!resetsAt || !nowMs) return ''
   const ms = Date.parse(resetsAt) - nowMs
   if (Number.isNaN(ms)) return ''
-  if (ms <= 0) return '回復済み'
+  if (ms <= 0) return '' // 回復した後は時間を出さない（使用率も 0% と出す・shownPercent）
   const minutes = Math.ceil(ms / MINUTE)
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
   if (days > 0) return isDaysOnly ? `${days}d` : `${days}d${hours}h`
   if (hours > 0) return minutes % 60 === 0 ? `${hours}h` : `${hours}h${minutes % 60}m`
   return `${minutes}m`
+}
+
+/**
+ * 表示する使用率。回復の時刻を過ぎたのに次の値がまだ届いていない間は、古い値の代わりに 0% と出す
+ * （次の返事で本当の値に置き換わる）
+ */
+export const shownPercent = (one: Limit, nowMs: number): number => {
+  const at = one.resetsAt ? Date.parse(one.resetsAt) : NaN
+  return nowMs && !Number.isNaN(at) && at <= nowMs ? 0 : one.percentUsed
 }
 
 /**
@@ -143,11 +152,12 @@ export const register: Register = on => {
       <Box flexDirection="row">
         {limits.map((one, i) => {
           const left = untilReset(one.resetsAt, nowMs, one.kind === 'seven_day')
+          const percent = shownPercent(one, nowMs)
           return (
             <Box key={one.kind} flexDirection="row">
               {i > 0 && <Text dimColor>{' / '}</Text>}
               <Text dimColor>{`${SHORT[one.kind]} `}</Text>
-              <Text color={tone(one.percentUsed)}>{`${one.percentUsed}%`}</Text>
+              <Text color={tone(percent)}>{`${percent}%`}</Text>
               {left !== '' && <Text dimColor>{` ${left}`}</Text>}
             </Box>
           )

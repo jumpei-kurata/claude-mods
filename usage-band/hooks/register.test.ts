@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { crossings, pick, tone, untilReset } from './register'
+import { crossings, pick, shownPercent, tone, untilReset } from './register'
 
 const NOW = Date.parse('2026-10-11T10:00:00Z')
 
@@ -9,8 +9,14 @@ describe('計算', () => {
     expect(untilReset('2026-10-11T12:13:00Z', NOW)).toBe('2h13m')
     expect(untilReset('2026-10-13T15:00:00Z', NOW)).toBe('2d5h')
     expect(untilReset('2026-10-11T10:05:00Z', NOW)).toBe('5m')
-    expect(untilReset('2026-10-11T09:00:00Z', NOW)).toBe('回復済み')
+    expect(untilReset('2026-10-11T09:00:00Z', NOW)).toBe('')
     expect(untilReset(undefined, NOW)).toBe('')
+  })
+
+  test('回復の時刻を過ぎたら、次の値が届くまで 0% と出す', () => {
+    expect(shownPercent({ kind: 'five_hour', percentUsed: 1, resetsAt: '2026-10-11T09:00:00Z' }, NOW)).toBe(0)
+    expect(shownPercent({ kind: 'five_hour', percentUsed: 42, resetsAt: '2026-10-11T12:00:00Z' }, NOW)).toBe(42)
+    expect(shownPercent({ kind: 'five_hour', percentUsed: 42 }, NOW)).toBe(42)
   })
 
   test('週の枠は1日以上なら日数だけ', () => {
