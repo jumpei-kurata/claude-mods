@@ -1,5 +1,7 @@
-# Claude Code が mod を読み込んだ時に作る型ファイル（毎回作り直される）
+# Type files Claude Code writes when it loads a mod (rewritten every time)
 .claude-plugin/types/
 */.claude-plugin/types/
+# Local worktrees
+.claude/
 .DS_Store
 node_modules/

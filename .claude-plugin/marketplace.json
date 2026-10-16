@@ -5,7 +5,7 @@
     {
       "name": "usage-band",
       "source": "./usage-band",
-      "description": "5時間・1週間の使用量と、戻るまでの時間を入力欄の下の段の右側に常に表示する"
+      "description": "Shows your 5-hour and weekly Claude usage, and the time until each resets, next to the prompt"
     }
   ]
 }

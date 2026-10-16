@@ -3,10 +3,10 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Limit, Usage } from '../types'
 
-// 入力欄の下の段の右側（SessionMode の表示）に、5時間・1週間の使用量と回復までの時間を常に出す。
-// 会話の枠を狭めないよう、行は増やさない（2026-10-11 倉田さんの選択で、入力欄の上の帯から移した）。
-// データは Claude Code 自身が持っている使用量（$.session.usage と session.measure）だけを読む。
-// ネット通信・ファイルの読み書き・コマンド実行はしない。
+// Shows the 5-hour and weekly usage, and the time until each resets, in the SessionMode slot
+// next to the prompt. It adds no row of its own, so the conversation keeps its height.
+// It reads only the usage Claude Code already has ($.session.usage and session.measure):
+// no network calls, no file access, no commands.
 
 const usage = atom({ plugin: 'usage-band', key: 'usage' } as const, {
   limits: [],
@@ -14,16 +14,16 @@ const usage = atom({ plugin: 'usage-band', key: 'usage' } as const, {
 } as Usage)
 const now = atom({ plugin: 'usage-band', key: 'now' } as const, 0)
 
-const LABEL: Record<string, string> = { five_hour: '5時間', seven_day: '1週間' }
-// 下の段の表示用。デスクトップはこの場所の幅が決まっていて、長いと「…」で切られる（実測・約13文字分）。
-// 枠の名前は大文字、残り時間は小文字にして見分ける（5H 29% 1h15m / 7D 15% 4d・2026-10-11 倉田さんと決定）
+const LABEL: Record<string, string> = { five_hour: '5-hour', seven_day: 'Weekly' }
+// The desktop app gives this slot a fixed width and cuts longer text with "…" (about 13 characters),
+// so the label is short: limit names in capitals, times in lower case (5H 29% 1h15m / 7D 15% 4d).
 const SHORT: Record<string, string> = { five_hour: '5H', seven_day: '7D' }
 const ORDER = ['five_hour', 'seven_day']
 const WARN_AT = [80, 95]
 const STORE_KEY = 'last'
 const MINUTE = 60_000
 
-/** 5時間・1週間の枠だけを、決まった順に並べる */
+/** Keeps only the 5-hour and weekly limits, 5-hour first */
 export const pick = (list: readonly Limit[]): Limit[] =>
   list
     .filter(one => one.kind in LABEL)
@@ -34,19 +34,20 @@ export const pick = (list: readonly Limit[]): Limit[] =>
     )
     .sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind))
 
-/** 使用率に応じた色（テーマの色名なので、ライトでもダークでも読める） */
+/** Colour by usage (theme colour names, readable in light and dark) */
 export const tone = (percent: number) =>
   percent >= 80 ? 'error' : percent >= 50 ? 'warning' : 'success'
 
 /**
- * 回復までの残り時間を短く（1h23m ／ 45m ／ 2d5h・倉田さんの指定）。タイムゾーンに左右されないよう残りで出す。
- * isDaysOnly は週の枠用: 1日以上なら日数だけ（4d）にして幅を節約する
+ * Time left until the limit resets, kept short (1h23m / 45m / 2d5h). Counted as time left,
+ * so the time zone doesn't matter. isDaysOnly is for the weekly limit: whole days only (4d)
+ * once a day or more is left, to save width.
  */
 export const untilReset = (resetsAt: string | undefined, nowMs: number, isDaysOnly = false): string => {
   if (!resetsAt || !nowMs) return ''
   const ms = Date.parse(resetsAt) - nowMs
   if (Number.isNaN(ms)) return ''
-  if (ms <= 0) return '' // 回復した後は時間を出さない（使用率も 0% と出す・shownPercent）
+  if (ms <= 0) return '' // after the reset, no time is shown (and the usage shows 0%, see shownPercent)
   const minutes = Math.ceil(ms / MINUTE)
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
@@ -56,8 +57,8 @@ export const untilReset = (resetsAt: string | undefined, nowMs: number, isDaysOn
 }
 
 /**
- * 表示する使用率。回復の時刻を過ぎたのに次の値がまだ届いていない間は、古い値の代わりに 0% と出す
- * （次の返事で本当の値に置き換わる）
+ * The usage to show. Once the reset time has passed but no new value has arrived yet,
+ * show 0% instead of the old value (the next reply brings the real one).
  */
 export const shownPercent = (one: Limit, nowMs: number): number => {
   const at = one.resetsAt ? Date.parse(one.resetsAt) : NaN
@@ -65,9 +66,11 @@ export const shownPercent = (one: Limit, nowMs: number): number => {
 }
 
 /**
- * 80%・95% を新しく超えた枠の知らせ文（枠ごとに一番高いものだけ）。
- * seen は「もう知らせた」の記録。下回ったら記録を消し、次に超えた時にまた知らせる。
- * isQuiet の時は記録だけして知らせない（開いた直後に、前から超えていた分を鳴らさないため）。
+ * Messages for limits that newly passed 80% or 95% (only the highest one per limit).
+ * seen records what was already announced; dropping below a threshold clears it,
+ * so the next time it is passed it is announced again.
+ * With isQuiet, it only records and announces nothing (so opening a session
+ * doesn't announce thresholds that were already passed before).
  */
 export const crossings = (list: readonly Limit[], seen: Set<string>, isQuiet: boolean): string[] => {
   const out: string[] = []
@@ -85,23 +88,23 @@ export const crossings = (list: readonly Limit[], seen: Set<string>, isQuiet: bo
       }
     }
     if (top > 0 && !isQuiet) {
-      out.push(`${LABEL[one.kind]}の使用量が${top}%を超えました（いま${one.percentUsed}%）`)
+      out.push(`${LABEL[one.kind]} usage passed ${top}% (now ${one.percentUsed}%)`)
     }
   }
   return out
 }
 
-// 「もう知らせた」の記録と、最初の受け取りが済んだか（読み込み直すとリセットされる）
+// What was already announced, and whether the first value has arrived (reset on reload)
 const seen = new Set<string>()
 let isSeeded = false
 
-/** 「今」を進めて、回復までの時間を数え直す */
+/** Moves "now" forward so the time until reset is counted again */
 async function tick($: EngineInterface) {
   const at = await $.clock.now()
   await update($, now, () => at)
 }
 
-/** 受け取った使用量を表示・保存し、新しく超えたしきい値を知らせる */
+/** Shows and saves the usage it received, and announces thresholds newly passed */
 async function take($: EngineInterface, raw: readonly Limit[]) {
   const limits = pick(raw)
   if (limits.length === 0) return
@@ -116,7 +119,7 @@ async function take($: EngineInterface, raw: readonly Limit[]) {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    // 1分ごとに回復までの時間を数え直す
+    // Count the time until reset again every minute
     await tick($)
     $.clock.every(MINUTE, () => {
       void tick($)
@@ -126,7 +129,7 @@ export const register: Register = on => {
     if (current.rateLimits.length > 0) {
       await take($, current.rateLimits)
     } else {
-      // まだ最初の返事が来ていない時は、前回の値を「前回の値」と明記して出しておく
+      // Before the first reply, show the last known values, marked as such
       const saved = (await $.store.get(STORE_KEY)) as { limits?: Limit[] } | undefined
       const limits = pick(saved?.limits ?? [])
       if (limits.length > 0) await update($, usage, () => ({ limits, isStale: true }))
@@ -140,7 +143,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // 例: 5H 29% 1h15m / 7D 15% 4d。元からある表示（focus など）は後ろに残す
+  // e.g. 5H 29% 1h15m / 7D 15% 4d. The slot's own content (focus, etc.) stays after it
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     const { limits, isStale } = await read($, usage)
     if (limits.length === 0) return next(e)
@@ -162,7 +165,7 @@ export const register: Register = on => {
             </Box>
           )
         })}
-        {isStale && <Text dimColor>（前回）</Text>}
+        {isStale && <Text dimColor> (last)</Text>}
         {modes.length > 0 && <Text dimColor>{` & ${modes.join(' & ')}`}</Text>}
       </Box>
     )

@@ -1,7 +1,7 @@
-/** 使用量の枠1つ（5時間 or 1週間） */
+/** One usage limit (5-hour or weekly) */
 export type Limit = { kind: string; percentUsed: number; resetsAt?: string }
 
-/** 表示する使用量。isStale は「このセッションではまだ最新を受け取っていない＝前回の値」 */
+/** The usage to show. isStale: this session has not received a fresh value yet (last known values) */
 export type Usage = { limits: Limit[]; isStale: boolean }
 
 declare module 'claude-code' {
