@@ -1,6 +1,7 @@
 {
   "name": "kurata-mods",
   "owner": { "name": "Jumpei Kurata" },
+  "description": "Mods for Claude Code by Jumpei Kurata",
   "plugins": [
     {
       "name": "usage-band",
